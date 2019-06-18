@@ -14,7 +14,7 @@ class Todo {
   factory Todo.fromMap(Map<String, dynamic> json) =>  new Todo(
     id: json['id'],
     item: json['item'],
-    completed: json['completed']
+    completed: json['completed'] == 1,
   );
 
   Map<String, dynamic> toMap() => {

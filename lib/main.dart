@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/database.dart';
 import 'data/todo_model.dart';
 
 void main() => runApp(MyApp());
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: MyHomePage(title: 'Todo'),
     );
   }
 }
@@ -37,19 +38,28 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  List<Todo> todos = [
-    Todo(id: 1, item: 'Todo1', completed: false),
-    Todo(id: 2, item: 'Todo2', completed: true),
-    Todo(id: 3, item: 'Todo3', completed: false),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: ListView(children: todos.map((todo) => _buildTile(todo)).toList()),
+      body: FutureBuilder<List<Todo>>(
+        future: DBProvider.db.getAllTodos(),
+        builder: (BuildContext context, AsyncSnapshot<List<Todo>> snapshot) {
+          if (snapshot.hasData) {
+            return ListView.builder(
+              itemCount: snapshot.data.length,
+              itemBuilder: (BuildContext context, int index) {
+                Todo todo = snapshot.data[index];
+                return _buildTile(todo);
+              },
+            );
+          } else {
+            return Center(child: CircularProgressIndicator());
+          }
+        },
+      ),
     );
   }
 
@@ -61,9 +71,8 @@ class _MyHomePageState extends State<MyHomePage> {
         trailing: Checkbox(
           value: todo.completed,
           onChanged: (value) {
-            setState(() {
-              todo.completed = value;  
-            });
+            DBProvider.db.completedOrUncompleteTask(todo);
+            setState(() {});
           },
         ),
       ),
