@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:todo_app/data/database.dart';
+import 'package:provider/provider.dart';
 
-import 'data/database.dart';
+import 'state/app_state.dart';
 import 'data/todo_model.dart';
 
 void main() => runApp(MyApp());
@@ -9,21 +11,17 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(builder: (_) => AppState()),
+      ],
+      child: MaterialApp(
+        title: 'Flutter Demo',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
+        home: MyHomePage(title: 'Flutter Demo Home Page'),
       ),
-      home: MyHomePage(title: 'Todo'),
     );
   }
 }
@@ -38,34 +36,111 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  int _currentIndex = 0;
+  final List<Widget> _children = [Todos(), Completed()];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: FutureBuilder<List<Todo>>(
-        future: DBProvider.db.getAllTodos(),
-        builder: (BuildContext context, AsyncSnapshot<List<Todo>> snapshot) {
-          if (snapshot.hasData) {
-            return ListView.builder(
-              itemCount: snapshot.data.length,
-              itemBuilder: (BuildContext context, int index) {
-                Todo todo = snapshot.data[index];
-                return _buildTile(todo);
-              },
-            );
-          } else {
-            return Center(child: CircularProgressIndicator());
-          }
+      body: _children[Provider.of<AppState>(context).bottomIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.list), title: Text("Todos")),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.check), title: Text("Completed")),
+        ],
+        currentIndex: Provider.of<AppState>(context).bottomIndex,
+        onTap: (index) {
+          Provider.of<AppState>(context).changeBottomIndex(index);
         },
       ),
     );
   }
+}
+
+class Todos extends StatefulWidget {
+  @override
+  _TodosState createState() => _TodosState();
+}
+
+class _TodosState extends State<Todos> {
+  final textController = TextEditingController();
+
+  @override
+  void dispose() {
+    textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.max,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: TextField(
+                controller: textController,
+                decoration: InputDecoration(hintText: "What to do?"),
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.send),
+              onPressed: () {
+                DBProvider.db.newTodo(textController.text);
+                setState(() {});
+              },
+            )
+          ],
+        ),
+        Expanded(
+          child: FutureBuilder<List<Todo>>(
+            future: DBProvider.db.getUncompletedTodos(),
+            builder:
+                (BuildContext context, AsyncSnapshot<List<Todo>> snapshot) {
+              if (snapshot.hasData) {
+                return ListView.builder(
+                  itemCount: snapshot.data.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    Todo todo = snapshot.data[index];
+                    return _buildTile(todo);
+                  },
+                );
+              } else {
+                return Center(child: CircularProgressIndicator());
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildTile(Todo todo) {
-    return Container(
-      padding: EdgeInsets.all(10),
+    return Dismissible(
+      key: UniqueKey(),
+      direction: DismissDirection.endToStart,
+      dismissThresholds: <DismissDirection, double>{
+        DismissDirection.endToStart: 0.7,
+      },
+      onDismissed: (direction) {
+        DBProvider.db.deleteTodo(todo.id);
+        setState(() {});
+      },
+      background: Container(
+        color: Colors.red,
+        child: Align(
+          alignment: FractionalOffset(0.9, 0.5),
+          child: Icon(
+            Icons.delete,
+            color: Colors.white,
+          ),
+        ),
+      ),
       child: ListTile(
         title: Text(todo.item),
         trailing: Checkbox(
@@ -74,6 +149,45 @@ class _MyHomePageState extends State<MyHomePage> {
             DBProvider.db.completedOrUncompleteTask(todo);
             setState(() {});
           },
+        ),
+      ),
+    );
+  }
+}
+
+class Completed extends StatefulWidget {
+  @override
+  _CompletedState createState() => _CompletedState();
+}
+
+class _CompletedState extends State<Completed> {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Todo>>(
+      future: DBProvider.db.getCompletedTodos(),
+      builder: (BuildContext context, AsyncSnapshot<List<Todo>> snapshot) {
+        if (snapshot.hasData) {
+          return ListView.builder(
+            itemCount: snapshot.data.length,
+            itemBuilder: (BuildContext context, int index) {
+              Todo todo = snapshot.data[index];
+              return _buildCompletedTile(todo);
+            },
+          );
+        } else {
+          return Center(child: CircularProgressIndicator());
+        }
+      },
+    );
+  }
+
+  Widget _buildCompletedTile(Todo todo) {
+    return Container(
+      padding: EdgeInsets.all(10),
+      child: ListTile(
+        title: Text(
+          '${todo.item}',
+          style: TextStyle(decoration: TextDecoration.lineThrough),
         ),
       ),
     );
