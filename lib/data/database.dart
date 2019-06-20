@@ -68,6 +68,12 @@ class DBProvider {
         [id, item, false]);
   }
 
+  deleteAllCompletedTodos() async {
+    final db = await database;
+    return await db.delete("Todo", where: "completed = ?", whereArgs: [1]);
+    
+  }
+
   Future<List<Todo>> getAllTodos() async {
     final db = await database;
     var res = await db.query("Todo");

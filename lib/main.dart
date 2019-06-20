@@ -36,7 +36,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _currentIndex = 0;
   final List<Widget> _children = [Todos(), Completed()];
 
   @override
@@ -80,22 +79,21 @@ class _TodosState extends State<Todos> {
     return Column(
       mainAxisSize: MainAxisSize.max,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: TextField(
-                controller: textController,
-                decoration: InputDecoration(hintText: "What to do?"),
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.send),
-              onPressed: () {
-                DBProvider.db.newTodo(textController.text);
-                setState(() {});
-              },
-            )
-          ],
+        TextField(
+          textCapitalization: TextCapitalization.sentences,
+          maxLength: 40,
+          controller: textController,
+          onSubmitted: (value) async {
+            print('Value:' + value);
+            if (value.length > 0) await DBProvider.db.newTodo(value);
+            textController.clear();
+            setState(() {});
+          },
+          decoration: new InputDecoration(
+            hintText: 'Enter something to do...',
+            contentPadding: const EdgeInsets.all(25.0),
+            border: OutlineInputBorder(),
+          ),
         ),
         Expanded(
           child: FutureBuilder<List<Todo>>(
@@ -146,8 +144,9 @@ class _TodosState extends State<Todos> {
         trailing: Checkbox(
           value: todo.completed,
           onChanged: (value) {
-            DBProvider.db.completedOrUncompleteTask(todo);
-            setState(() {});
+            setState(() {
+              DBProvider.db.completedOrUncompleteTask(todo);
+            });
           },
         ),
       ),
@@ -163,21 +162,40 @@ class Completed extends StatefulWidget {
 class _CompletedState extends State<Completed> {
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Todo>>(
-      future: DBProvider.db.getCompletedTodos(),
-      builder: (BuildContext context, AsyncSnapshot<List<Todo>> snapshot) {
-        if (snapshot.hasData) {
-          return ListView.builder(
-            itemCount: snapshot.data.length,
-            itemBuilder: (BuildContext context, int index) {
-              Todo todo = snapshot.data[index];
-              return _buildCompletedTile(todo);
+    return Container(
+      child: Column(
+        children: <Widget>[
+          Expanded(
+            child: FutureBuilder<List<Todo>>(
+              future: DBProvider.db.getCompletedTodos(),
+              builder:
+                  (BuildContext context, AsyncSnapshot<List<Todo>> snapshot) {
+                if (snapshot.hasData) {
+                  return ListView.builder(
+                    itemCount: snapshot.data.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      Todo todo = snapshot.data[index];
+                      return _buildCompletedTile(todo);
+                    },
+                  );
+                } else {
+                  return Center(child: CircularProgressIndicator());
+                }
+              },
+            ),
+          ),
+          FloatingActionButton.extended(
+            onPressed: () {
+              DBProvider.db.deleteAllCompletedTodos();
+              setState(() {});
             },
-          );
-        } else {
-          return Center(child: CircularProgressIndicator());
-        }
-      },
+            icon: Icon(Icons.clear_all),
+            label: Text("Clear All Completed"),
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(),
+          ),
+        ],
+      ),
     );
   }
 
